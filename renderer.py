@@ -42,7 +42,7 @@ def render_overview():
     
     # Get all machines:
     machines = headscale.get_machines(url, api_key)
-    machines_count = len(machines["machines"])
+    machines_count = len(machines["nodes"])
 
     # Need to check if routes are attached to an active machine:
     # ISSUE:  https://github.com/iFargle/headscale-webui/issues/36 
@@ -53,19 +53,19 @@ def render_overview():
 
     total_routes = 0
     for route in routes["routes"]:
-        if int(route['machine']['id']) != 0: 
+        if int(route['node']['id']) != 0: 
             total_routes += 1
 
     enabled_routes = 0
     for route in routes["routes"]:
-        if route["enabled"] and route['advertised'] and int(route['machine']['id']) != 0: 
+        if route["enabled"] and route['advertised'] and int(route['node']['id']) != 0: 
             enabled_routes += 1
 
     # Get a count of all enabled exit routes
     exits_count = 0
     exits_enabled_count = 0
     for route in routes["routes"]:
-        if route['advertised'] and int(route['machine']['id']) != 0:
+        if route['advertised'] and int(route['node']['id']) != 0:
             if route["prefix"] == "0.0.0.0/0" or route["prefix"] == "::/0":
                 exits_count +=1
                 if route["enabled"]:
@@ -236,6 +236,7 @@ def thread_machine_content(machine, machine_content, idx, all_routes, failover_p
 
     # app.logger.debug("Machine Information")
     # app.logger.debug(str(machine))
+
     app.logger.debug("Machine Information =================")
     app.logger.debug("Name:  %s, ID:  %s, User:  %s, givenName: %s, ", str(machine["name"]), str(machine["id"]), str(machine["user"]["name"]), str(machine["givenName"]))
 
@@ -349,7 +350,7 @@ def thread_machine_content(machine, machine_content, idx, all_routes, failover_p
             for route in pulled_routes["routes"]:
                 # Get the remaining routes - No exits or failover pairs
                 if route["prefix"] != "0.0.0.0/0" and route["prefix"] != "::/0" and route["prefix"] not in failover_pair_prefixes:
-                    app.logger.debug("Route:  ["+str(route['machine']['name'])+"] id: "+str(route['id'])+" / prefix: "+str(route['prefix'])+" enabled?:  "+str(route['enabled']))
+                    app.logger.debug("Route:  ["+str(route['node']['name'])+"] id: "+str(route['id'])+" / prefix: "+str(route['prefix'])+" enabled?:  "+str(route['enabled']))
                     route_enabled = "red"
                     route_tooltip = 'enable'
                     if route["enabled"]:
@@ -398,12 +399,14 @@ def thread_machine_content(machine, machine_content, idx, all_routes, failover_p
 
     # Format the dates for easy readability
     last_seen_parse   = parser.parse(machine["lastSeen"])
-    last_seen_local   = last_seen_parse.astimezone(timezone)
+    last_seen_local   = local_time if machine["online"] is True else last_seen_parse.astimezone(timezone)
     last_seen_delta   = local_time - last_seen_local
     last_seen_print   = helper.pretty_print_duration(last_seen_delta)
     last_seen_time    = str(last_seen_local.strftime('%A %m/%d/%Y, %H:%M:%S'))+" "+str(timezone)+" ("+str(last_seen_print)+")"
-    
-    last_update_parse = local_time if machine["lastSuccessfulUpdate"] is None else parser.parse(machine["lastSuccessfulUpdate"])
+
+    # This value is not returned
+    # last_update_parse = local_time if machine["updatedAt"] is None else parser.parse(machine["updatedAt"])
+    last_update_parse = local_time if machine["lastSeen"] is None else parser.parse(machine["lastSeen"])
     last_update_local = last_update_parse.astimezone(timezone)
     last_update_delta = local_time - last_update_local
     last_update_print = helper.pretty_print_duration(last_update_delta)
@@ -487,7 +490,7 @@ def render_machines_cards():
 
     #########################################
     # Thread this entire thing.  
-    num_threads = len(machines_list["machines"])
+    num_threads = len(machines_list["nodes"])
     iterable = []
     machine_content = {}
     failover_pair_prefixes = []
@@ -503,10 +506,10 @@ def render_machines_cards():
 
     if LOG_LEVEL == "DEBUG":
         # DEBUG:  Do in a forloop:
-        for idx in iterable: thread_machine_content(machines_list["machines"][idx], machine_content, idx, all_routes, failover_pair_prefixes)
+        for idx in iterable: thread_machine_content(machines_list["nodes"][idx], machine_content, idx, all_routes, failover_pair_prefixes)
     else:
         app.logger.info("Starting futures")
-        futures = [executor.submit(thread_machine_content, machines_list["machines"][idx], machine_content, idx, all_routes, failover_pair_prefixes) for idx in iterable]
+        futures = [executor.submit(thread_machine_content, machines_list["nodes"][idx], machine_content, idx, all_routes, failover_pair_prefixes) for idx in iterable]
         # Wait for the executor to finish all jobs:
         wait(futures, return_when=ALL_COMPLETED)
         app.logger.info("Finished futures")
@@ -683,8 +686,8 @@ def render_routes():
     all_routes_id_list = []
     for route in all_routes["routes"]:
         all_routes_id_list.append(route["id"])
-        if route["machine"]["name"]:
-            app.logger.info("Found route %s / machine: %s", str(route["id"]), route["machine"]["name"])
+        if route["node"]["name"]:
+            app.logger.info("Found route %s / machine: %s", str(route["id"]), route["node"]["name"])
         else: 
             app.logger.info("Route id %s has no machine associated.", str(route["id"]))
 
@@ -729,7 +732,7 @@ def render_routes():
     for route in all_routes["routes"]:
         # Get relevant info:
         route_id    = route["id"]
-        machine     = route["machine"]["givenName"]
+        machine     = route["node"]["givenName"]
         prefix      = route["prefix"]
         is_enabled  = route["enabled"]
         is_primary  = route["isPrimary"]
@@ -827,8 +830,8 @@ def render_routes():
             for route_id in route_id_list:
                 idx = all_routes_id_list.index(route_id)
 
-                machine    = all_routes["routes"][idx]["machine"]["givenName"]
-                machine_id = all_routes["routes"][idx]["machine"]["id"]
+                machine    = all_routes["routes"][idx]["node"]["givenName"]
+                machine_id = all_routes["routes"][idx]["node"]["id"]
                 is_primary = all_routes["routes"][idx]["isPrimary"]
                 is_enabled = all_routes["routes"][idx]["enabled"]
 
@@ -866,8 +869,8 @@ def render_routes():
     for route in all_routes["routes"]:
         # For every exit route found, store the machine name in an array:
         if route["prefix"] == "0.0.0.0/0" or route["prefix"] == "::/0":
-            if route["machine"]["givenName"] not in exit_node_list: 
-                exit_node_list.append(route["machine"]["givenName"])
+            if route["node"]["givenName"] not in exit_node_list: 
+                exit_node_list.append(route["node"]["givenName"])
 
     # Exit node display building:
     # Display by machine, not by route
@@ -889,9 +892,9 @@ def render_routes():
         machine_id = 0
         for route in all_routes["routes"]:
             if route["prefix"] == "0.0.0.0/0" or route["prefix"] == "::/0":
-                if route["machine"]["givenName"] == node:
+                if route["node"]["givenName"] == node:
                     node_exit_route_ids.append(route["id"])
-                    machine_id = route["machine"]["id"]
+                    machine_id = route["node"]["id"]
                     exit_available = True
                     if route["enabled"]:
                         exit_enabled = True
