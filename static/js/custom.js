@@ -406,6 +406,12 @@ function load_modal_move_machine(machine_id) {
                     modal_body = document.getElementById('modal_content');
                     modal_confirm = document.getElementById('modal_confirm');
 
+                    // check v22 or v23 attr
+                    if(headscale?.node) {
+                        headscale.machine = headscale.node
+                    }
+                    // end
+
                     modal_title.innerHTML = "Move machine '" + headscale.machine.givenName + "'?"
 
                     select_html = `<h6>Select a User</h6><select id='move-select'>`
@@ -470,6 +476,12 @@ function load_modal_delete_machine(machine_id) {
             modal_body = document.getElementById('modal_content');
             modal_confirm = document.getElementById('modal_confirm');
 
+            // check v22 or v23 attr
+            if(response?.node) {
+               response.machine = response.node
+            }
+            // end
+
             modal_title.innerHTML = "Delete machine '" + response.machine.givenName + "'?"
             body_html = `
             <ul class="collection">
@@ -519,6 +531,12 @@ function load_modal_rename_machine(machine_id) {
             modal_title = document.getElementById('modal_title');
             modal_body = document.getElementById('modal_content');
             modal_confirm = document.getElementById('modal_confirm');
+
+            // check v22 or v23 attr
+            if(response?.node) {
+               response.machine = response.node
+            }
+            // end
 
             modal_title.innerHTML = "Rename machine '" + response.machine.givenName + "'?"
             body_html = `
@@ -670,6 +688,11 @@ function add_machine() {
         data: JSON.stringify(data),
         contentType: "application/json",
         success: function (response) {
+            // check v22 or v23 attr
+            if(response?.node) {
+               response.machine = response.node
+            }
+            // end
             if (response.machine) {
                 window.location.reload()
                 return
@@ -725,6 +748,12 @@ function move_machine(machine_id) {
         data: JSON.stringify(data),
         contentType: "application/json",
         success: function (response) {
+            // check v22 or v23 attr
+            if(response?.node) {
+               response.machine = response.node
+            }
+            // end
+            
             // Get the modal element and close it
             modal_element = document.getElementById('card_modal')
             M.Modal.getInstance(modal_element).close()
