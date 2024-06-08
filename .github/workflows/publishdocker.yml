@@ -11,9 +11,7 @@ name: Publish Docker image
 
 on:
   push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+    branches: [ "ktz373-patch-1" ]
 
 jobs:
   push_to_registry:
